@@ -1,7 +1,17 @@
+# fastapi==0.94.0
+# pydantic==1.10.6
+# uvicorn==0.21.0
+# uvloop==0.17.0
 
-fastapi==0.79.0
-orjson==3.4.1
-pydantic==1.9.0
-uvicorn==0.18.2
-uvloop==0.14.0
-
+fastapi[all]
+uvicorn[standard]
+pydantic[dotenv]
+orjson==3.8.7
+SQLAlchemy==2.0.4
+# SQLAlchemy-Utils==0.38.3
+asyncpg==0.27.0
+psycopg2-binary==2.9.5
+# databases[postgresql]==0.7.0
+alembic==1.10.2
+fastapi-users[sqlalchemy]==10.4.0
+python-dotenv==1.0.0

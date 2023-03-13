@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+
+  postgresql:
+    image: postgres:15.2
+    container_name: filipp_sprint_4
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/postgresql/data/pgdata/
+    volumes:
+      - filipp_sprint_4:/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+
+volumes:
+  filipp_sprint_4:
