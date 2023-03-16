@@ -10,8 +10,11 @@ from alembic import context
 from dotenv import load_dotenv
 
 from db.db import Base
+from models.general import ShortLink
 
 load_dotenv('.env')
+
+# ShortLink
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

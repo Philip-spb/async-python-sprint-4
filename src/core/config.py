@@ -15,6 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_NAME = os.environ['PROJECT_NAME']
 PROJECT_HOST = os.environ['PROJECT_HOST']
 PROJECT_PORT = int(os.environ['PROJECT_PORT'])
+SECRET = os.environ['SECRET']
 
 
 class AppSettings(BaseSettings):
