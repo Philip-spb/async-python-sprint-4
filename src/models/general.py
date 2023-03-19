@@ -13,9 +13,6 @@ from sqlalchemy.orm import relationship, mapped_column, Mapped
 from db.db import Base, get_async_session
 
 
-# https://github.com/hajime9652/task-log/blob/6ae07fad11b7713c734a4bf23278316ddbed57ce/backend_sqlite/app/db.py
-
-
 class User(SQLAlchemyBaseUserTableUUID, Base):
     links = relationship("ShortLink", back_populates="owner", lazy=False)
 

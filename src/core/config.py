@@ -18,7 +18,6 @@ PROJECT_PORT = int(os.environ['PROJECT_PORT'])
 SECRET = os.environ['SECRET']
 
 BLACK_LIST = [
-    # '127.0.0.1',
     '56.24.15.106'
 ]
 

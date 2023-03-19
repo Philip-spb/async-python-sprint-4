@@ -1,5 +1,7 @@
 from typing import Any, List
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
@@ -10,10 +12,12 @@ from models.general import User
 from schemas.access_log import AccessLogToDBBase, AccessLogStatistic
 from schemas.short_link import (ShortLinkSchemaCreate, ShortLinkSchemaList, ShortLinkCreate,
                                 ShortLinkToDBBase, ShortLinkUpdate, LinkType)
-from services.helpers import id_generator, is_valid_url
+from services.helpers import id_generator
 from services.shortlink import short_link_crud, access_log_crud
 from services.users import current_active_user
 
+
+logger = logging.getLogger()
 shorten_url_router = APIRouter()
 
 
@@ -39,7 +43,7 @@ async def ping_db(
                          response_model=ShortLinkSchemaCreate,
                          status_code=status.HTTP_201_CREATED
                          )
-async def create_create_short_link(
+async def create_short_link(
         *,
         db: AsyncSession = Depends(get_async_session),
         user: User = Depends(current_active_user),
@@ -49,9 +53,6 @@ async def create_create_short_link(
     Create new short link
     """
 
-    if not is_valid_url(link.original_url):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='This is not the URL')
-
     short_link = id_generator()
 
     new_link = ShortLinkToDBBase(
@@ -60,8 +61,8 @@ async def create_create_short_link(
         owner_id=user.id if user else None,
         type=link.type if user else LinkType.PUBLIC.value
     )
-    entity = await short_link_crud.create(db=db, obj_in=new_link)
-    return entity
+    short_link = await short_link_crud.create(db=db, obj_in=new_link)
+    return short_link
 
 
 @shorten_url_router.get('/{short_url}', status_code=status.HTTP_307_TEMPORARY_REDIRECT)
@@ -75,19 +76,19 @@ async def redirect_to_link(
     """
     Redirect by short link
     """
-    entity = await short_link_crud.get(db=db, short_url=short_url)
-    if not entity:
+    short_link = await short_link_crud.get(db=db, short_url=short_url)
+    if not short_link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
         )
 
-    if not entity.is_active:
+    if not short_link.is_active:
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail='Item deleted'
         )
 
-    if entity.type == 'private':
-        if not user or user != entity.owner:
+    if short_link.type == 'private':
+        if not user or user != short_link.owner:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'
             )
@@ -96,12 +97,14 @@ async def redirect_to_link(
 
     access_log = AccessLogToDBBase(
         connection_info=history,
-        short_link_id=entity.id
+        short_link_id=short_link.id
     )
 
     await access_log_crud.create(db=db, obj_in=access_log)
 
-    return RedirectResponse(url=entity.original_url)
+    logger.info(f'Redirect by the short link ({short_url}) to the url ({short_link.original_url})')
+
+    return RedirectResponse(url=short_link.original_url)
 
 
 @shorten_url_router.get('/user/status', response_model=List[ShortLinkSchemaList])
@@ -132,24 +135,26 @@ async def delete_link(
     """
     Delete short link
     """
-    entity = await short_link_crud.get(db=db, short_url=short_url)
-    if not entity:
+    short_link = await short_link_crud.get(db=db, short_url=short_url)
+    if not short_link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
         )
 
-    if not entity.is_active:
+    if not short_link.is_active:
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail='Item deleted'
         )
 
-    if entity.owner:
-        if not user or user != entity.owner:
+    if short_link.owner:
+        if not user or user != short_link.owner:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'
             )
 
-    await short_link_crud.soft_delete(db=db, db_obj=entity)
+    await short_link_crud.soft_delete(db=db, db_obj=short_link)
+
+    logger.info(f'Deleted the short link ({short_url})')
 
     return {'success': True}
 
@@ -166,20 +171,20 @@ async def update_link(
         type_data: ShortLinkUpdate
 ) -> Any:
     """
-    Update short link. Only for registered user.
+    Update short link. Only for registered user and only for changing type parameter.
     """
-    entity = await short_link_crud.get(db=db, short_url=short_url)
-    if not entity:
+    short_link = await short_link_crud.get(db=db, short_url=short_url)
+    if not short_link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
         )
 
-    if not entity.is_active:
+    if not short_link.is_active:
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail='Item deleted'
         )
 
-    if not user or user != entity.owner:
+    if not user or user != short_link.owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'
         )
@@ -191,9 +196,15 @@ async def update_link(
             detail=f'You can choose only: {acceptable_types}'
         )
 
-    await short_link_crud.update(db=db, db_obj=entity, obj_in=type_data)
+    if type_data.type == short_link.type:
+        logger.info(f'Nothing to change at the short link ({short_url})')
+        return short_link
 
-    return entity
+    await short_link_crud.update(db=db, db_obj=short_link, obj_in=type_data)
+
+    logger.info(f'Has been edited the short link ({short_url}) privacy type to {type_data.type}')
+
+    return short_link
 
 
 @shorten_url_router.get('/{short_url}/status', response_model=AccessLogStatistic)
@@ -206,6 +217,9 @@ async def get_link_statistic(
         user: User = Depends(current_active_user),
         short_url: str,
 ) -> Any:
+    """
+    Get the history of short link usage.
+    """
     short_link = await short_link_crud.get(db=db, short_url=short_url)
     if not short_link:
         raise HTTPException(

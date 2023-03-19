@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
-from typing import Optional, Dict
-from pydantic import BaseModel, Field, root_validator
+from typing import Optional, Dict, Literal
+from pydantic import BaseModel, Field, root_validator, AnyUrl
 
 from core import config
 
@@ -11,13 +11,16 @@ class LinkType(Enum):
     PUBLIC = 'public'
 
     @classmethod
-    def items(cls):  # Нужно для использования в качестве choises в полях моделей
+    def items(cls):
         return (i.value for i in cls)
 
 
 class ShortLinkBase(BaseModel):
-    original_url: str = Field(alias='original-url')
-    type: Optional[str] = LinkType.PUBLIC.value
+    original_url: AnyUrl = Field(alias='original-url')
+    type: Literal[
+        LinkType.PUBLIC.value,
+        LinkType.PRIVATE.value
+    ] = LinkType.PUBLIC.value
 
     class Config:
         allow_population_by_field_name = True
@@ -28,12 +31,15 @@ class ShortLinkCreate(ShortLinkBase):
 
 
 class ShortLinkUpdate(BaseModel):
-    type: Optional[str] = LinkType.PUBLIC.value
+    type: Literal[
+        LinkType.PUBLIC.value,
+        LinkType.PRIVATE.value
+    ] = LinkType.PUBLIC.value
 
 
 class ShortLinkToDBBase(ShortLinkBase):
     short_url: str
-    original_url: str
+    original_url: AnyUrl
     type: Optional[str] = LinkType.PUBLIC.value
     owner_id: Optional[UUID]
     is_active: Optional[bool]
@@ -59,7 +65,7 @@ class ShortLinkSchemaCreate(ShortLinkInDBBase):
 
 
 class ShortLinkSchemaList(ShortLinkInDBBase):
-    original_url: str = Field(alias='original-url')
+    original_url: AnyUrl = Field(alias='original-url')
     type: str
 
 
