@@ -16,10 +16,6 @@ from db.db import Base, get_async_session
 # https://github.com/hajime9652/task-log/blob/6ae07fad11b7713c734a4bf23278316ddbed57ce/backend_sqlite/app/db.py
 
 
-# class ShortLinkTypes(enum.Enum):
-#     public = 'public'
-#     private = 'private'
-
 class User(SQLAlchemyBaseUserTableUUID, Base):
     links = relationship("ShortLink", back_populates="owner", lazy=False)
 
@@ -38,7 +34,7 @@ class ShortLink(Base):
     owner: Mapped[Optional[User]] = relationship(User, back_populates='links', lazy=False)
     is_active: Mapped[Optional[bool]] = mapped_column(server_default='True')
     create_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    links: Mapped[List["AccessLog"]] = relationship(lazy=False)
+    connections: Mapped[List["AccessLog"]] = relationship(lazy=False)
 
 
 class AccessLog(Base):

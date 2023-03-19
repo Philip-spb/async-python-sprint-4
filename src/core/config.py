@@ -17,6 +17,11 @@ PROJECT_HOST = os.environ['PROJECT_HOST']
 PROJECT_PORT = int(os.environ['PROJECT_PORT'])
 SECRET = os.environ['SECRET']
 
+BLACK_LIST = [
+    # '127.0.0.1',
+    '56.24.15.106'
+]
+
 
 class AppSettings(BaseSettings):
     app_title: str = "LibraryApp"

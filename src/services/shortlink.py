@@ -1,10 +1,16 @@
-from models.general import ShortLink as ShortLinkModel
-from schemas.base import ShortLinkCreate, ShortLinkUpdate
-from .base import RepositoryDB
+from models.general import ShortLink as ShortLinkModel, AccessLog as AccessLogModel
+from schemas.access_log import AccessLogCreate, AccessLogUpdate
+from schemas.short_link import ShortLinkCreate, ShortLinkUpdate
+from services.base import RepositoryDB
 
 
-class RepositoryEntity(RepositoryDB[ShortLinkModel, ShortLinkCreate, ShortLinkUpdate]):
+class RepositoryShortLink(RepositoryDB[ShortLinkModel, ShortLinkCreate, ShortLinkUpdate]):
     pass
 
 
-short_link_crud = RepositoryEntity(ShortLinkModel)
+class RepositoryAccessLog(RepositoryDB[AccessLogModel, AccessLogCreate, AccessLogUpdate]):
+    pass
+
+
+short_link_crud = RepositoryShortLink(ShortLinkModel)
+access_log_crud = RepositoryAccessLog(AccessLogModel)

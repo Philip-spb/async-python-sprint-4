@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator
 
 from core.config import app_settings
 from sqlalchemy.orm import DeclarativeBase
@@ -16,10 +16,3 @@ async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
-
-
-# # Функция понадобится при внедрении зависимостей
-# # Dependency
-# async def get_session() -> AsyncSession:
-#     async with async_session() as session:
-#         yield session

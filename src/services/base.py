@@ -1,14 +1,12 @@
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Generic, List, Optional, Type, TypeVar, Union, Dict, Any
 from pydantic import BaseModel
 
 from fastapi.encoders import jsonable_encoder
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from sqlalchemy.orm import contains_eager
 
 from db.db import Base
-from models.general import ShortLink
 
 ModelType = TypeVar("ModelType", bound=Base)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
@@ -26,34 +24,49 @@ class Repository:
     def create(self, *args, **kwargs):
         raise NotImplementedError
 
-    # def update(self, *args, **kwargs):
-    #     raise NotImplementedError
-    #
-    # def delete(self, *args, **kwargs):
-    #     raise NotImplementedError
+    def update(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def delete(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model: Type[ModelType]):
         self._model = model
 
-    async def get(self, db: AsyncSession, id: Any) -> Optional[ModelType]:
-        statement = select(self._model).where(self._model.id == id)
-        results = await db.execute(statement=statement)
-        return results.unique().scalar_one_or_none()
+    async def get(self, db: AsyncSession, **kwargs) -> Optional[ModelType]:
 
-    async def get_by_short_url(self, db: AsyncSession, short_url: str) -> Optional[ModelType]:
-        statement = select(self._model).where(self._model.short_url == short_url)
+        statement = select(self._model)
+
+        for key, value in kwargs.items():
+            statement = statement.where(getattr(self._model, key) == value)
+
         results = await db.execute(statement=statement)
         return results.unique().scalar_one_or_none()
 
     async def get_multi(
             self,
             db: AsyncSession,
+            offset: Optional[int] = None,
+            limit: Optional[int] = None,
+            **kwargs
     ) -> List[ModelType]:
-        statement = select(self._model).order_by('id')
+        statement = select(self._model)
+
+        for key, value in kwargs.items():
+            statement = statement.where(getattr(self._model, key) == value)
+
+        if offset:
+            statement = statement.offset(offset)
+
+        if limit:
+            statement = statement.limit(limit)
+
+        statement = statement.order_by('id')
+
         results = await db.execute(statement=statement)
-        return results.scalars().unique().all()
+        return results.unique().scalars().all()
 
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         obj_in_data = jsonable_encoder(obj_in)
@@ -63,31 +76,37 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType, UpdateSchema
         await db.refresh(db_obj)
         return db_obj
 
-    # async def update(
-    #         self,
-    #         db: AsyncSession,
-    #         *,
-    #         db_obj: ModelType,
-    #         obj_in: Union[UpdateSchemaType, Dict[str, Any]]
-    # ) -> ModelType:
-    #     stmt = (
-    #         update(Entity).
-    #         where(Entity.id == db_obj.id).
-    #         values(obj_in.dict(exclude_unset=True)).
-    #         returning(Entity)
-    #     )
-    #     await db.execute(stmt)
-    #     await db.commit()
-    #
-    #     return db_obj
-    #
-    # async def delete(
-    #         self,
-    #         db: AsyncSession,
-    #         *,
-    #         db_obj: ModelType,
-    # ) -> ModelType:
-    #     await db.delete(db_obj)
-    #     await db.commit()
-    #
-    #     return db_obj
+    async def update(
+            self,
+            db: AsyncSession,
+            *,
+            db_obj: ModelType,
+            obj_in: Union[UpdateSchemaType, Dict[str, Any]]
+    ) -> ModelType:
+        stmt = (
+            update(self._model).
+            where(self._model.id == db_obj.id).
+            values(obj_in.dict(exclude_unset=True)).
+            returning(self._model)
+        )
+        await db.execute(stmt)
+        await db.commit()
+
+        return db_obj
+
+    async def soft_delete(
+            self,
+            db: AsyncSession,
+            *,
+            db_obj: ModelType,
+    ) -> ModelType:
+        stmt = (
+            update(self._model).
+            where(self._model.id == db_obj.id).
+            values(is_active=False).
+            returning(self._model)
+        )
+        await db.execute(stmt)
+        await db.commit()
+
+        return db_obj
