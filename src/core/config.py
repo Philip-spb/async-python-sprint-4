@@ -12,20 +12,15 @@ load_dotenv('.env')
 logging_config.dictConfig(LOGGING)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-PROJECT_NAME = os.environ['PROJECT_NAME']
-PROJECT_HOST = os.environ['PROJECT_HOST']
-PROJECT_PORT = int(os.environ['PROJECT_PORT'])
-SECRET = os.environ['SECRET']
-
-BLACK_LIST = [
-    '56.24.15.106'
-]
-
 
 class AppSettings(BaseSettings):
     app_title: str = "LibraryApp"
+    project_name: str
+    project_host: str
+    project_port: int
     database_dsn: PostgresDsn
     secret: str
+    black_list: list
 
     class Config:
         env_file = '.env'

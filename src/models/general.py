@@ -26,7 +26,7 @@ class ShortLink(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     short_url: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     original_url: Mapped[str] = mapped_column(String(4096), nullable=False)
-    type: Mapped[str] = mapped_column(String(100), server_default='public', nullable=False)
+    link_type: Mapped[str] = mapped_column(String(100), server_default='public', nullable=False)
     owner_id: Mapped[Optional[GUID]] = mapped_column(ForeignKey('user.id'))
     owner: Mapped[Optional[User]] = relationship(User, back_populates='links', lazy=False)
     is_active: Mapped[Optional[bool]] = mapped_column(server_default='True')
