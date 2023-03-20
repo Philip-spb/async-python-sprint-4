@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Optional, Dict, Literal
 from pydantic import BaseModel, Field, root_validator, AnyUrl
 
-from core import config
+from core.config import app_settings
 
 
 class LinkType(Enum):
@@ -17,7 +17,7 @@ class LinkType(Enum):
 
 class ShortLinkBase(BaseModel):
     original_url: AnyUrl = Field(alias='original-url')
-    type: Literal[
+    link_type: Literal[
         LinkType.PUBLIC.value,
         LinkType.PRIVATE.value
     ] = LinkType.PUBLIC.value
@@ -31,7 +31,7 @@ class ShortLinkCreate(ShortLinkBase):
 
 
 class ShortLinkUpdate(BaseModel):
-    type: Literal[
+    link_type: Literal[
         LinkType.PUBLIC.value,
         LinkType.PRIVATE.value
     ] = LinkType.PUBLIC.value
@@ -40,7 +40,7 @@ class ShortLinkUpdate(BaseModel):
 class ShortLinkToDBBase(ShortLinkBase):
     short_url: str
     original_url: AnyUrl
-    type: Optional[str] = LinkType.PUBLIC.value
+    link_type: Optional[str] = LinkType.PUBLIC.value
     owner_id: Optional[UUID]
     is_active: Optional[bool]
 
@@ -52,7 +52,9 @@ class ShortLinkInDBBase(BaseModel):
     @root_validator
     def compute_area(cls, values) -> Dict:
         short_url = values.get('short_url')
-        values['short_url'] = f'http://{config.PROJECT_HOST}:{config.PROJECT_PORT}/{short_url}'
+        values['short_url'] = (
+            f'http://{app_settings.project_host}:{app_settings.project_port}/{short_url}'
+        )
         return values
 
     class Config:
@@ -66,7 +68,7 @@ class ShortLinkSchemaCreate(ShortLinkInDBBase):
 
 class ShortLinkSchemaList(ShortLinkInDBBase):
     original_url: AnyUrl = Field(alias='original-url')
-    type: str
+    link_type: str = Field(alias='type')
 
 
 class ShortLinkInDB(ShortLinkInDBBase):

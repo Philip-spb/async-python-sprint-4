@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.sql.selectable import Select
 
 from db.db import Base
 
@@ -31,6 +32,14 @@ class Repository:
         raise NotImplementedError
 
 
+def set_params(statement: Select, model: Type[ModelType], params: dict) -> Select:
+
+    for key, value in params.items():
+        statement = statement.where(getattr(model, key) == value)
+
+    return statement
+
+
 class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def __init__(self, model: Type[ModelType]):
         self._model = model
@@ -38,9 +47,7 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType, UpdateSchema
     async def get(self, db: AsyncSession, **kwargs) -> Optional[ModelType]:
 
         statement = select(self._model)
-
-        for key, value in kwargs.items():
-            statement = statement.where(getattr(self._model, key) == value)
+        statement = set_params(statement, self._model, kwargs)
 
         results = await db.execute(statement=statement)
         return results.unique().scalar_one_or_none()
@@ -53,9 +60,7 @@ class RepositoryDB(Repository, Generic[ModelType, CreateSchemaType, UpdateSchema
             **kwargs
     ) -> List[ModelType]:
         statement = select(self._model)
-
-        for key, value in kwargs.items():
-            statement = statement.where(getattr(self._model, key) == value)
+        statement = set_params(statement, self._model, kwargs)
 
         if offset:
             statement = statement.offset(offset)

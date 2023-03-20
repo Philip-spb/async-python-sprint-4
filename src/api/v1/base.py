@@ -1,5 +1,9 @@
-from fastapi import APIRouter
+from typing import Any
 
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.db import get_async_session
 from schemas.users import UserRead, UserCreate
 from services.users import fastapi_users, auth_backend
 
@@ -16,3 +20,21 @@ api_router.include_router(
     prefix='/auth',
     tags=['auth'],
 )
+
+
+@api_router.get('/ping')
+async def ping_db(
+        *,
+        db: AsyncSession = Depends(get_async_session),
+) -> Any:
+    """
+    Check DB connection status
+    """
+
+    try:
+        await db.connection()
+        connection_status = True
+    except Exception:
+        connection_status = False
+
+    return {'Connected': connection_status}

@@ -2,7 +2,7 @@ from typing import Any, List
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, BackgroundTasks
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,31 +12,13 @@ from models.general import User
 from schemas.access_log import AccessLogToDBBase, AccessLogStatistic
 from schemas.short_link import (ShortLinkSchemaCreate, ShortLinkSchemaList, ShortLinkCreate,
                                 ShortLinkToDBBase, ShortLinkUpdate, LinkType)
-from services.helpers import id_generator
+from services.helpers import id_generator, short_link_validation
 from services.shortlink import short_link_crud, access_log_crud
 from services.users import current_active_user
 
 
 logger = logging.getLogger()
 shorten_url_router = APIRouter()
-
-
-@shorten_url_router.get('/ping')
-async def ping_db(
-        *,
-        db: AsyncSession = Depends(get_async_session),
-) -> Any:
-    """
-    Check DB connection status
-    """
-
-    try:
-        await db.connection()
-        connection_status = True
-    except Exception:
-        connection_status = False
-
-    return {'Connected': connection_status}
 
 
 @shorten_url_router.post('/',
@@ -59,10 +41,18 @@ async def create_short_link(
         short_url=short_link,
         original_url=link.original_url,
         owner_id=user.id if user else None,
-        type=link.type if user else LinkType.PUBLIC.value
+        type=link.link_type if user else LinkType.PUBLIC.value
     )
     short_link = await short_link_crud.create(db=db, obj_in=new_link)
     return short_link
+
+
+async def redirect_logging(db: AsyncSession, history: str, short_link_id: int):
+    access_log = AccessLogToDBBase(
+        connection_info=history,
+        short_link_id=short_link_id
+    )
+    await access_log_crud.create(db=db, obj_in=access_log)
 
 
 @shorten_url_router.get('/{short_url}', status_code=status.HTTP_307_TEMPORARY_REDIRECT)
@@ -70,6 +60,7 @@ async def redirect_to_link(
         *,
         db: AsyncSession = Depends(get_async_session),
         request: Request,
+        background_tasks: BackgroundTasks,
         user: User = Depends(current_active_user),
         short_url: str
 ) -> Any:
@@ -77,17 +68,10 @@ async def redirect_to_link(
     Redirect by short link
     """
     short_link = await short_link_crud.get(db=db, short_url=short_url)
-    if not short_link:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
-        )
 
-    if not short_link.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail='Item deleted'
-        )
+    short_link_validation(short_link)
 
-    if short_link.type == 'private':
+    if short_link.link_type == 'private':
         if not user or user != short_link.owner:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'
@@ -95,12 +79,7 @@ async def redirect_to_link(
 
     history = str(jsonable_encoder(request.headers))
 
-    access_log = AccessLogToDBBase(
-        connection_info=history,
-        short_link_id=short_link.id
-    )
-
-    await access_log_crud.create(db=db, obj_in=access_log)
+    background_tasks.add_task(redirect_logging, db, history, short_link.id)
 
     logger.info(f'Redirect by the short link ({short_url}) to the url ({short_link.original_url})')
 
@@ -136,15 +115,8 @@ async def delete_link(
     Delete short link
     """
     short_link = await short_link_crud.get(db=db, short_url=short_url)
-    if not short_link:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
-        )
 
-    if not short_link.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail='Item deleted'
-        )
+    short_link_validation(short_link)
 
     if short_link.owner:
         if not user or user != short_link.owner:
@@ -174,35 +146,30 @@ async def update_link(
     Update short link. Only for registered user and only for changing type parameter.
     """
     short_link = await short_link_crud.get(db=db, short_url=short_url)
-    if not short_link:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
-        )
 
-    if not short_link.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail='Item deleted'
-        )
+    short_link_validation(short_link)
 
     if not user or user != short_link.owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'
         )
 
-    if type_data.type not in LinkType.items():
+    if type_data.link_type not in LinkType.items():
         acceptable_types = ', '.join(LinkType.items())
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'You can choose only: {acceptable_types}'
         )
 
-    if type_data.type == short_link.type:
+    if type_data.link_type == short_link.link_type:
         logger.info(f'Nothing to change at the short link ({short_url})')
         return short_link
 
     await short_link_crud.update(db=db, db_obj=short_link, obj_in=type_data)
 
-    logger.info(f'Has been edited the short link ({short_url}) privacy type to {type_data.type}')
+    logger.info(
+        f'Has been edited the short link ({short_url}) privacy type to {type_data.link_type}'
+    )
 
     return short_link
 
@@ -221,17 +188,10 @@ async def get_link_statistic(
     Get the history of short link usage.
     """
     short_link = await short_link_crud.get(db=db, short_url=short_url)
-    if not short_link:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='Item not found'
-        )
 
-    if not short_link.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_410_GONE, detail='Item deleted'
-        )
+    short_link_validation(short_link)
 
-    if short_link.type == 'private':
+    if short_link.link_type == 'private':
         if not user or user != short_link.owner:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail='You have not access'

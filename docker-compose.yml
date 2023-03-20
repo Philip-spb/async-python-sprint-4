@@ -15,5 +15,16 @@ services:
     ports:
       - "5432:5432"
 
+  # Only for test purposes without data saving
+  postgresql-test:
+    image: postgres:15.2
+    container_name: filipp_sprint_4_test
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5433:5432"
+
 volumes:
   filipp_sprint_4:
