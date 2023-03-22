@@ -22,7 +22,7 @@ api_router.include_router(
 )
 
 
-@api_router.get('/ping')
+@api_router.get('/ping', tags=['main'])
 async def ping_db(
         *,
         db: AsyncSession = Depends(get_async_session),
