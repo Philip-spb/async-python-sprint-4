@@ -24,8 +24,8 @@ async def test_access_from_allowed_ip(mocker, event_loop):
 
 async def test_create_user(event_loop):
     user_data = {
-        "email": 'homer@simpson.com',
-        "password": 'springfield',
+        'email': 'homer@simpson.com',
+        'password': 'springfield',
     }
     async with AsyncClient(app=app, base_url='http://test') as ac:
         response = await ac.post(app.url_path_for('register:register'), json=user_data)
@@ -37,7 +37,15 @@ async def test_create_and_delete_shortlink(event_loop):
     async with AsyncClient(app=app, base_url='http://test') as ac:
         response = await ac.post(app.url_path_for('create_short_link'), json=link)
         assert response.status_code == status.HTTP_201_CREATED
+
         data = ShortLinkSchemaCreate.parse_obj(json.loads(response.content.decode()))
         short_url = data.short_url.split('/')[-1]
+
+        response = await ac.get(f'/{short_url}')
+        assert response.status_code == status.HTTP_307_TEMPORARY_REDIRECT
+
         response = await ac.delete(f'/{short_url}')
         assert response.status_code == status.HTTP_200_OK
+
+        response = await ac.get(f'/{short_url}')
+        assert response.status_code == status.HTTP_410_GONE

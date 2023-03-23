@@ -17,8 +17,8 @@ def event_loop():
 @pytest.fixture(scope='session', autouse=True)
 def test_db_engine(event_loop):
     config = Config()
-    config.set_main_option("script_location", "src/migrations")
+    config.set_main_option('script_location', 'src/migrations')
 
-    upgrade(config, "head")
+    upgrade(config, 'head')
     yield engine
-    downgrade(config, "base")
+    downgrade(config, 'base')
