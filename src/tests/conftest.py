@@ -14,7 +14,7 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope='session', autouse=True)
 def test_db_engine(event_loop):
     config = Config()
     config.set_main_option("script_location", "src/migrations")

@@ -1,4 +1,3 @@
-import pytest
 import json
 from fastapi import status
 from httpx import AsyncClient
@@ -7,7 +6,6 @@ from main import app
 from schemas.short_link import ShortLinkSchemaCreate
 
 
-@pytest.mark.asyncio
 async def test_access_from_forbidden_ip(mocker, event_loop):
     mock_client = mocker.patch('fastapi.Request.client')
     mock_client.host = '56.24.15.106'
@@ -16,7 +14,6 @@ async def test_access_from_forbidden_ip(mocker, event_loop):
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-@pytest.mark.asyncio
 async def test_access_from_allowed_ip(mocker, event_loop):
     mock_client = mocker.patch('fastapi.Request.client')
     mock_client.host = '192.168.1.1'
@@ -25,7 +22,6 @@ async def test_access_from_allowed_ip(mocker, event_loop):
         assert response.status_code == status.HTTP_200_OK
 
 
-@pytest.mark.asyncio
 async def test_create_user(event_loop):
     user_data = {
         "email": 'homer@simpson.com',
@@ -36,7 +32,6 @@ async def test_create_user(event_loop):
         assert response.status_code == status.HTTP_201_CREATED
 
 
-@pytest.mark.asyncio
 async def test_create_and_delete_shortlink(event_loop):
     link = {'original-url': 'http://www.ya.ru'}
     async with AsyncClient(app=app, base_url='http://test') as ac:
