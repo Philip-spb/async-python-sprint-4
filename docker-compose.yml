@@ -2,9 +2,28 @@ version: '3.8'
 
 services:
 
+  api:
+    build: .
+    container_name: fastapi_test_api_docker
+    expose:
+      - "8000"
+    depends_on:
+      - postgresql
+
+
+  nginx:
+    image: nginx:1.19.2
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/configs:/etc/nginx/conf.d:ro
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
   postgresql:
     image: postgres:15.2
-    container_name: filipp_sprint_4
+    container_name: filipp_sprint_4_db
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
